@@ -226,7 +226,7 @@ if __name__ == "__main__":
 
         # Create a test query embedding
         client = OpenAI()
-        test_query = "What are the dangerous goods?"
+        test_query = "Welke voorwaarden hebben schepen waarvan de ladingzone is voor 30 december 2018 is omgebouwd?"
         query_embedding = client.embeddings.create(
             model="text-embedding-3-small",
             input=test_query
