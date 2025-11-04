@@ -59,6 +59,7 @@ graph = workflow.compile()
 #     print("Could not display graph")
 
 # Test the workflow
-messages = [HumanMessage(content="Welke voorwaarden hebben schepen waarvan de ladingzone is voor 30 december 2018 is omgebouwd?")]
-result = graph.invoke({"messages": messages})
-print(result)
+if __name__ == "__main__":
+    messages = [HumanMessage(content="Welke voorwaarden hebben schepen waarvan de ladingzone is voor 30 december 2018 is omgebouwd?")]
+    result = graph.invoke({"messages": messages})
+    print(result)

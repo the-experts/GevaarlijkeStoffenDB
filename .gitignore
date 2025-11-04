@@ -1,3 +1,13 @@
 .idea/
 .env
 uv.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/

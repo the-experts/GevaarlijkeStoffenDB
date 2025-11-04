@@ -147,6 +147,25 @@ class PostgresDBConnector:
         """
         return self.execute_query(query, (query_embedding, query_embedding, limit))
 
+    def document_exists(self, source_file):
+        """Check if a document already exists in the database.
+
+        Args:
+            source_file: Name of the source PDF file (filename only)
+
+        Returns:
+            bool: True if at least one chunk exists for this document, False otherwise
+        """
+        query = """
+            SELECT EXISTS(
+                SELECT 1 FROM document_chunks
+                WHERE source_file = %s
+                LIMIT 1
+            );
+        """
+        result = self.execute_query(query, (source_file,))
+        return result[0][0] if result else False
+
     def close_pool(self):
         """Close all connections in the pool."""
         if self.connection_pool:
