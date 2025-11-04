@@ -4,50 +4,17 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END, START  # ✅ Import END from here
 
 from State import AgentState
-from Tools import embed_question, router_agent, PBM_agent, stoffen_agent, query_db
+from Tools import embed_question, router_agent, PBM_agent, stoffen_agent, route_query, query_db
 
 # Initialize model
 model = ChatOpenAI(model="gpt-4", temperature=0)
 
-
-def llm_call(state: dict):
-    """LLM decides whether to call a tool or not"""
-    return {
-        "messages": [
-            model.invoke(
-                [
-                    SystemMessage(
-                        content="You are a helpful assistant tasked with performing arithmetic on a set of inputs."
-                    )
-                ]
-                + state["messages"]
-            )
-        ],
-        "llm_calls": state.get('llm_calls', 0) + 1
-    }
-
-
-def route_query(state: AgentState) -> str:
-    """
-    Route the query to the appropriate agent.
-    Returns: "stoffen" or "pbm"
-    """
-    messages = state.get("messages", [])
-    last_message = messages[-1].content.lower() if messages else ""
-
-    # Your routing logic
-    if "pbm" in last_message:
-        return "pbm"
-    else:
-        return "stoffen"  # Default to stoffen
 
 
 # Define workflow
 workflow = StateGraph(AgentState)
 
 # Add nodes
-
-workflow.add_node("llm_call", llm_call)
 workflow.add_node("embed_question", embed_question)
 workflow.add_node("query_db", query_db)
 workflow.add_node("router_agent", router_agent)
@@ -55,8 +22,7 @@ workflow.add_node("stoffen_agent", stoffen_agent)
 workflow.add_node("PBM_agent", PBM_agent)
 
 # Add edges
-workflow.add_edge(START, "llm_call")
-workflow.add_edge("llm_call", "embed_question")
+workflow.add_edge(START, "embed_question")
 workflow.add_edge("embed_question", "query_db")
 workflow.add_edge("query_db", "router_agent")
 
@@ -93,6 +59,6 @@ graph = workflow.compile()
 #     print("Could not display graph")
 
 # Test the workflow
-messages = [HumanMessage(content="Is worcestershire sauce a dangerous good")]
+messages = [HumanMessage(content="Welke voorwaarden hebben schepen waarvan de ladingzone is voor 30 december 2018 is omgebouwd?")]
 result = graph.invoke({"messages": messages})
 print(result)
