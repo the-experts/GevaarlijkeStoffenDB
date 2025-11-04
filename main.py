@@ -209,15 +209,15 @@ if __name__ == "__main__":
 
     try:
         # Process PDF and store in database
-        pdf_path = ("ADN 2023 Small.pdf")
-        chunks_stored = process_and_store_pdf(
-            pdf_path=pdf_path,
-            db_connector=db,
-            max_length=1000,
-            overlap=100
-        )
+        # pdf_path = ("ADN 2023 Small.pdf")
+        # chunks_stored = process_and_store_pdf(
+        #     pdf_path=pdf_path,
+        #     db_connector=db,
+        #     max_length=1000,
+        #     overlap=100
+        # )
 
-        print(f"\n✓ Successfully processed and stored {chunks_stored} chunks from {pdf_path}")
+        # print(f"\n✓ Successfully processed and stored {chunks_stored} chunks from {pdf_path}")
 
         # Example: Search for similar chunks
         print("\n" + "="*60)
@@ -238,8 +238,8 @@ if __name__ == "__main__":
         print(f"\nQuery: '{test_query}'")
         print(f"Top {len(results)} similar chunks:\n")
 
-        for i, (chunk_id, source_file, page_num, chunk_idx, content, similarity) in enumerate(results, 1):
-            print(f"{i}. [Page {page_num}, Chunk {chunk_idx}] Similarity: {similarity:.4f}")
+        for i, (id, source_file, page_number, chunk_index, content, similarity) in enumerate(results, 1):
+            print(f"{i}. [Page {page_number}, Chunk {chunk_index}] Similarity: {similarity:.4f}")
             print(f"   Source: {source_file}")
             print(f"   Content preview: {content[:200]}...")
             print()
@@ -252,32 +252,3 @@ if __name__ == "__main__":
     finally:
         # Clean up database connection
         db.close_pool()
-
-
-
-
-
-
-
-from dotenv import load_dotenv
-from Tools import load_pdf, text_to_chunks, embed_chunks
-
-# -- Main function --
-if __name__ == "__main__":
-    load_dotenv()
-
-    # 1. PDF inladen
-    documents = load_pdf("ADN+2023.pdf") # <-- jouw bestand
-    print(f"PDF geladen met {len(documents)} document(en)")
-
-    # 2. Tekst opdelen in chunks
-    splitted_docs = text_to_chunks(documents)
-    print(f"Opgesplitst in {len(splitted_docs)} chunks")
-
-    # 3. embed chuncks
-    embedded = embed_chunks(splitted_docs)
-
-    # (optioneel) bekijken wat er in zit
-    for i, doc in enumerate(splitted_docs[:3]):
-        print(f"\n--- Chunk {i + 1} ---")
-        print(doc.page_content[:500])

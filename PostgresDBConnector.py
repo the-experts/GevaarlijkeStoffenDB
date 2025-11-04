@@ -3,6 +3,7 @@ import psycopg2
 from psycopg2 import pool
 from dotenv import load_dotenv
 from contextlib import contextmanager
+from pgvector.psycopg2 import register_vector
 
 # Load environment variables
 load_dotenv()
@@ -41,6 +42,8 @@ class PostgresDBConnector:
         connection = None
         try:
             connection = self.connection_pool.getconn()
+            # Register pgvector type for this connection
+            register_vector(connection)
             yield connection
         except psycopg2.Error as e:
             print(f"✗ Database error: {e}")
@@ -136,10 +139,10 @@ class PostgresDBConnector:
         """
         query = """
             SELECT id, source_file, page_number, chunk_index, content,
-                   1 - (embedding <=> %s) AS similarity
+                   1 - (embedding <-> %s::vector) AS similarity
             FROM document_chunks
             WHERE embedding IS NOT NULL
-            ORDER BY embedding <=> %s
+            ORDER BY embedding <-> %s::vector
             LIMIT %s;
         """
         return self.execute_query(query, (query_embedding, query_embedding, limit))
