@@ -21,12 +21,17 @@ def extract_text_and_tables(pdf_path):
                     "content": text
                 })
             for table in page.extract_tables():
-                table_text = "\n".join([" | ".join(row) for row in table])
-                content.append({
-                    "type": "table",
-                    "page": page_number,
-                    "content": table_text
-                })
+                cleaned_rows = []
+                for row in table:
+                    cleaned_row = [cell if cell is not None else "" for cell in row]
+                    cleaned_rows.append(" | ".join(cleaned_row))
+                table_text = "\n".join(cleaned_rows)
+                if table_text.strip():
+                    content.append({
+                        "type": "table",
+                        "page": page_number,
+                        "content": table_text
+                    })
     return content
 
 
