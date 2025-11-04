@@ -6,13 +6,14 @@
 
 # Python/Poetry lock
 uv.lock
+__pycache__/
 
 # React / Node frontend
 /frontend/node_modules/
-/frontend/package-lock.json
 /frontend/dist/
 /frontend/build/
 /frontend/.env
 /frontend/.cache
 /frontend/.vite
 /frontend/.DS_Store
+/frontend/package-lock.json
