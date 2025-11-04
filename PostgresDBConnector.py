@@ -81,6 +81,69 @@ class PostgresDBConnector:
             cursor.execute(query, params)
             return cursor.rowcount
 
+    def store_document_chunk(self, source_file, page_number, chunk_index, content, embedding):
+        """Store a single document chunk with its embedding.
+
+        Args:
+            source_file: Name of the source PDF file
+            page_number: Page number in the PDF
+            chunk_index: Index of the chunk
+            content: Text content of the chunk
+            embedding: Vector embedding (list of floats)
+
+        Returns:
+            int: ID of the inserted row
+        """
+        query = """
+            INSERT INTO document_chunks (source_file, page_number, chunk_index, content, embedding)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (source_file, page_number, chunk_index)
+            DO UPDATE SET content = EXCLUDED.content, embedding = EXCLUDED.embedding
+            RETURNING id;
+        """
+        with self.get_cursor(commit=True) as cursor:
+            cursor.execute(query, (source_file, page_number, chunk_index, content, embedding))
+            return cursor.fetchone()[0]
+
+    def store_document_chunks_batch(self, chunks_data):
+        """Store multiple document chunks in a batch for efficiency.
+
+        Args:
+            chunks_data: List of tuples (source_file, page_number, chunk_index, content, embedding)
+
+        Returns:
+            int: Number of rows inserted/updated
+        """
+        query = """
+            INSERT INTO document_chunks (source_file, page_number, chunk_index, content, embedding)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (source_file, page_number, chunk_index)
+            DO UPDATE SET content = EXCLUDED.content, embedding = EXCLUDED.embedding;
+        """
+        with self.get_cursor(commit=True) as cursor:
+            cursor.executemany(query, chunks_data)
+            return cursor.rowcount
+
+    def search_similar_chunks(self, query_embedding, limit=5):
+        """Search for similar document chunks using vector similarity.
+
+        Args:
+            query_embedding: Query vector embedding (list of floats)
+            limit: Maximum number of results to return
+
+        Returns:
+            list of tuples: (id, source_file, page_number, content, similarity_score)
+        """
+        query = """
+            SELECT id, source_file, page_number, chunk_index, content,
+                   1 - (embedding <=> %s) AS similarity
+            FROM document_chunks
+            WHERE embedding IS NOT NULL
+            ORDER BY embedding <=> %s
+            LIMIT %s;
+        """
+        return self.execute_query(query, (query_embedding, query_embedding, limit))
+
     def close_pool(self):
         """Close all connections in the pool."""
         if self.connection_pool:
