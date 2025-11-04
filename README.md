@@ -14,6 +14,34 @@ LANGSMITH_API_KEY={langsmith_api_key}
 LANGSMITH_PROJECT=pr-rundown-good-27
 ```
 
+## Opstarten backend
+
+Om de API werkend te krijgen maken we gebruik van de FastAPI en Uvicorn
+
+Voer in de terminal het volgende commando uit:
+
+```bash
+uvicorn app:app --reload
+```
+
+➡️ Je backend draait nu op http://127.0.0.1:8000
+
+Om het werkend te krijgen in de frontend:
+```
+async function uploadPdf(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch("http://127.0.0.1:8000/process-pdf/", {
+    method: "POST",
+    body: formData,
+  });
+
+  const result = await response.json();
+  console.log(result);
+}
+```
+
 ## Wat moet er gebeuren:
 
 - Bronnen vinden (ADR, CLP, UN-nummerlijst)
@@ -52,3 +80,4 @@ Antwoord → frontend / API
   Adviseer juiste beschermingsmiddelen.
 - Document Ingest Agent:
   Automatisch nieuwe PDF’s, tabellen of documenten verwerken.
+
