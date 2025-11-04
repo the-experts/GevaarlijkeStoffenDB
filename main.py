@@ -235,15 +235,15 @@ if __name__ == "__main__":
 
     try:
         # Process PDF and store in database
-        pdf_path = ("ADN+2023+Small.pdf")
-        chunks_stored = process_and_store_pdf(
-            pdf_path=pdf_path,
-            db_connector=db,
-            max_length=1000,
-            overlap=100
-        )
+        # pdf_path = ("ADN+2023+Small.pdf")
+        # chunks_stored = process_and_store_pdf(
+        #     pdf_path=pdf_path,
+        #     db_connector=db,
+        #     max_length=1000,
+        #     overlap=100
+        # )
 
-        print(f"\n✓ Successfully processed and stored {chunks_stored} chunks from {pdf_path}")
+        # print(f"\n✓ Successfully processed and stored {chunks_stored} chunks from {pdf_path}")
 
         # Example: Search for similar chunks
         print("\n" + "="*60)
@@ -264,8 +264,8 @@ if __name__ == "__main__":
         print(f"\nQuery: '{test_query}'")
         print(f"Top {len(results)} similar chunks:\n")
 
-        for i, (chunk_id, source_file, page_num, chunk_idx, content, similarity) in enumerate(results, 1):
-            print(f"{i}. [Page {page_num}, Chunk {chunk_idx}] Similarity: {similarity:.4f}")
+        for i, (id, source_file, page_number, chunk_index, content, similarity) in enumerate(results, 1):
+            print(f"{i}. [Page {page_number}, Chunk {chunk_index}] Similarity: {similarity:.4f}")
             print(f"   Source: {source_file}")
             print(f"   Content preview: {content[:200]}...")
             print()
