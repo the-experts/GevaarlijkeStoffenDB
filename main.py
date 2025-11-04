@@ -73,7 +73,7 @@ def split_text(text, max_length=1000, overlap=100):
     return chunks
 
 
-def process_pages_to_chunks(pages, max_length=1000, overlap=100):
+def process_pages_to_chunks(pages, max_length=1000, overlap=100, min_last_chunk=500):
     """Process pages into chunks with metadata.
 
     Args:
@@ -84,23 +84,55 @@ def process_pages_to_chunks(pages, max_length=1000, overlap=100):
     Returns:
         list of dicts: [{'page_number': int, 'chunk_index': int, 'content': str}, ...]
     """
-    chunks_with_metadata = []
+    result = []
     global_chunk_index = 0
 
-    for page_number, text in pages:
-        page_chunks = split_text(text, max_length, overlap)
+    for item in pages:
+      cleaned_content = item["content"].strip().replace('\x00', '').replace('\u0000', '')
+      if item["type"] == "table":
+        # Append tables directly
+        result.append({
+          'page_number': item["page"],
+          'chunk_index': global_chunk_index,
+          'type': 'table',
+          'content': cleaned_content
+        })
+        global_chunk_index += 1
+      elif item["type"] == "text":
+        text = cleaned_content
+        text_length = len(text)
 
-        for local_index, chunk_text in enumerate(page_chunks):
-            # Additional sanitization: remove any NUL characters (defense in depth)
-            cleaned_content = chunk_text.strip().replace('\x00', '').replace('\u0000', '')
-            chunks_with_metadata.append({
-                'page_number': page_number,
-                'chunk_index': global_chunk_index,
-                'content': cleaned_content
+        if text_length <= max_length:
+          # Text fits in one chunk
+          result.append({
+            'page_number': item["page"],
+            'chunk_index': global_chunk_index,
+            'type': 'text',
+            'content': text
+          })
+          global_chunk_index += 1
+        else:
+          # First, split using the provided function
+          chunks = split_text(text, max_length, overlap)
+
+          # Check if last chunk is too small
+          if len(chunks) > 1 and len(chunks[-1]) < min_last_chunk:
+            # Recalculate to distribute evenly
+            num_chunks = len(chunks)
+            adjusted_max_length = text_length // num_chunks
+            chunks = split_text(text, adjusted_max_length, overlap)
+
+          # Add each chunk to result with chunk index
+          for chunk in enumerate(chunks):
+            result.append({
+              'page_number': item["page"],
+              'chunk_index': global_chunk_index,
+              'type': 'text',
+              'content': chunk[1]
             })
             global_chunk_index += 1
 
-    return chunks_with_metadata
+    return result
 
 
 def embed_chunks(chunks):
@@ -208,6 +240,7 @@ def process_and_store_pdf(pdf_path, db_connector, max_length=1000, overlap=100):
     batch_data = [
         (
             source_file,
+            chunk['type'],
             chunk['page_number'],
             chunk['chunk_index'],
             chunk['content'],
@@ -235,15 +268,15 @@ if __name__ == "__main__":
 
     try:
         # Process PDF and store in database
-        # pdf_path = ("ADN+2023+Small.pdf")
-        # chunks_stored = process_and_store_pdf(
-        #     pdf_path=pdf_path,
-        #     db_connector=db,
-        #     max_length=1000,
-        #     overlap=100
-        # )
+        pdf_path = ("ADN+2023+Small.pdf")
+        chunks_stored = process_and_store_pdf(
+            pdf_path=pdf_path,
+            db_connector=db,
+            max_length=1000,
+            overlap=100
+        )
 
-        # print(f"\n✓ Successfully processed and stored {chunks_stored} chunks from {pdf_path}")
+        print(f"\n✓ Successfully processed and stored {chunks_stored} chunks from {pdf_path}")
 
         # Example: Search for similar chunks
         print("\n" + "="*60)

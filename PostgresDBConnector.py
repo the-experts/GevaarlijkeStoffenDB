@@ -118,8 +118,8 @@ class PostgresDBConnector:
             int: Number of rows inserted/updated
         """
         query = """
-            INSERT INTO document_chunks (source_file, page_number, chunk_index, content, embedding)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO document_chunks (source_file, type, page_number, chunk_index, content, embedding)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (source_file, page_number, chunk_index)
             DO UPDATE SET content = EXCLUDED.content, embedding = EXCLUDED.embedding;
         """
