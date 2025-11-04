@@ -15,6 +15,7 @@ CREATE TABLE document_chunks (
     source_file VARCHAR(500) NOT NULL,
     page_number INTEGER NOT NULL,
     chunk_index INTEGER NOT NULL,
+    type VARCHAR(10) NOT NULL,
     content TEXT NOT NULL,
     embedding vector(1536),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
