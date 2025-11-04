@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BASE_URL } from "../config";
 
 export default function PdfUploadTab() {
     const [file, setFile] = useState(null);
@@ -16,7 +17,7 @@ export default function PdfUploadTab() {
         formData.append("overlap", 100);
 
         try {
-            const res = await fetch("http://localhost:8000/process-pdf/", {
+            const res = await fetch(`${BASE_URL}/process-pdf/`, {
                 method: "POST",
                 body: formData,
             });

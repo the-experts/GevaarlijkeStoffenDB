@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BASE_URL } from "../config";
 
 export default function QueryTab() {
     const [question, setQuestion] = useState("");
@@ -11,7 +12,7 @@ export default function QueryTab() {
         setResponse(null);
 
         try {
-            const res = await fetch("http://localhost:8000/query", {
+            const res = await fetch(`${BASE_URL}/query`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ question }),
