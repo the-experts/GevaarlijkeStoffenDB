@@ -1,3 +1,18 @@
+# IDE bestanden
 .idea/
+
+# Environment bestanden
 .env
+
+# Python/Poetry lock
 uv.lock
+
+# React / Node frontend
+/frontend/node_modules/
+/frontend/package-lock.json
+/frontend/dist/
+/frontend/build/
+/frontend/.env
+/frontend/.cache
+/frontend/.vite
+/frontend/.DS_Store

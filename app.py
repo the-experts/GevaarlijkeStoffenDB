@@ -20,11 +20,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.get("/")
 def root():
     return {"status": "ok", "message": "Backend is online"}
 
+@app.post("/query")
+async def query(question: dict):
+    q = question.get("question", "")
+    return {"answer": f"Dit is een testantwoord op: {q}"}
 
 @app.post("/process-pdf/")
 async def process_pdf(file: UploadFile, max_length: int = Form(1000), overlap: int = Form(100)):
