@@ -4,9 +4,30 @@ from langchain_core.tools import tool
 from dotenv import load_dotenv
 import pymupdf  # pymupdf
 import os
+import pdfplumber
 
 from openai import OpenAI
 from PostgresDBConnector import PostgresDBConnector
+
+def extract_text_and_tables(pdf_path):
+    content = []
+    with pdfplumber.open(pdf_path) as pdf:
+        for page_number, page in enumerate(pdf.pages, start=1):
+            text = page.extract_text() or ""
+            if text.strip():
+                content.append({
+                    "type": "text",
+                    "page": page_number,
+                    "content": text
+                })
+            for table in page.extract_tables():
+                table_text = "\n".join([" | ".join(row) for row in table])
+                content.append({
+                    "type": "table",
+                    "page": page_number,
+                    "content": table_text
+                })
+    return content
 
 
 def extract_text_from_pdf(file_path):
@@ -163,7 +184,7 @@ def process_and_store_pdf(pdf_path, db_connector, max_length=1000, overlap=100):
 
     # Step 1: Extract text from PDF
     print("Step 1: Extracting text from PDF...")
-    pages = extract_text_from_pdf(pdf_path)
+    pages = extract_text_and_tables(pdf_path)
     print(f"✓ Extracted {len(pages)} pages\n")
 
     # Step 2: Create chunks with metadata
@@ -252,32 +273,3 @@ if __name__ == "__main__":
     finally:
         # Clean up database connection
         db.close_pool()
-
-
-
-
-
-
-
-from dotenv import load_dotenv
-from Tools import load_pdf, text_to_chunks, embed_chunks
-
-# -- Main function --
-if __name__ == "__main__":
-    load_dotenv()
-
-    # 1. PDF inladen
-    documents = load_pdf("ADN+2023.pdf") # <-- jouw bestand
-    print(f"PDF geladen met {len(documents)} document(en)")
-
-    # 2. Tekst opdelen in chunks
-    splitted_docs = text_to_chunks(documents)
-    print(f"Opgesplitst in {len(splitted_docs)} chunks")
-
-    # 3. embed chuncks
-    embedded = embed_chunks(splitted_docs)
-
-    # (optioneel) bekijken wat er in zit
-    for i, doc in enumerate(splitted_docs[:3]):
-        print(f"\n--- Chunk {i + 1} ---")
-        print(doc.page_content[:500])
