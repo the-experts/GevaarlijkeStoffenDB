@@ -268,7 +268,7 @@ if __name__ == "__main__":
 
     try:
         # Process PDF and store in database
-        pdf_path = ("ADN+2023+Small.pdf")
+        pdf_path = ("ADN 2023 small.pdf")
         chunks_stored = process_and_store_pdf(
             pdf_path=pdf_path,
             db_connector=db,
