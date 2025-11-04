@@ -20,7 +20,7 @@ Om de API werkend te krijgen maken we gebruik van de FastAPI en Uvicorn
 
 Voer in de terminal het volgende commando uit:
 
-```
+```bash
 uvicorn app:app --reload
 ```
 
