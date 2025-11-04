@@ -1,16 +1,21 @@
 import { useState } from "react";
 import { BASE_URL } from "../config";
+import { useLoadingDots } from "../hooks/useLoadingDots"; // pas pad aan als nodig
 
 export default function PdfUploadTab() {
     const [file, setFile] = useState(null);
     const [response, setResponse] = useState(null);
     const [loading, setLoading] = useState(false);
 
+    const buttonText = useLoadingDots(loading, "Verwerken");
+
     const handleUpload = async (e) => {
         e.preventDefault();
         if (!file) return alert("Selecteer een PDF-bestand.");
 
         setLoading(true);
+        setResponse(null);
+
         const formData = new FormData();
         formData.append("file", file);
         formData.append("max_length", 1000);
@@ -38,7 +43,7 @@ export default function PdfUploadTab() {
                 onChange={(e) => setFile(e.target.files[0])}
             />
             <button type="submit" className="submit" disabled={loading}>
-                {loading ? "Verwerken..." : "Upload PDF"}
+                {loading ? buttonText : "Upload PDF"}
             </button>
 
             {response && (

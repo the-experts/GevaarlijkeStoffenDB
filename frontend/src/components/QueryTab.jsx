@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { BASE_URL } from "../config";
+import ReactMarkdown from "react-markdown";
+import { useLoadingDots } from "../hooks/useLoadingDots";
 
 export default function QueryTab() {
     const [question, setQuestion] = useState("");
     const [response, setResponse] = useState(null);
     const [loading, setLoading] = useState(false);
+
+    const buttonText = useLoadingDots(loading, "Verwerken");
 
     const handleAsk = async (e) => {
         e.preventDefault();
@@ -35,13 +39,17 @@ export default function QueryTab() {
           rows="4"
       />
             <button type="submit" className="submit" disabled={loading}>
-                {loading ? "Bezig..." : "Verstuur vraag"}
+                {loading ? buttonText : "Verstuur vraag"}
             </button>
 
             {response && (
                 <div className="answer-box">
                     <strong>Antwoord:</strong>
-                    <p>{response.answer || response.error || "Geen antwoord ontvangen."}</p>
+                    {response.answer ? (
+                        <ReactMarkdown>{response.answer}</ReactMarkdown>
+                    ) : (
+                        <p>{response.error || "Geen antwoord ontvangen."}</p>
+                    )}
                 </div>
             )}
         </form>

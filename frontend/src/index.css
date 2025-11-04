@@ -114,3 +114,23 @@ button.submit:disabled {
     padding: 0.8rem;
     margin-top: 0.8rem;
 }
+
+.answer-box h1,
+.answer-box h2,
+.answer-box h3 {
+    color: #1e40af;
+    margin-top: 1rem;
+}
+
+.answer-box p {
+    margin-top: 0.5rem;
+    line-height: 1.5;
+}
+
+.answer-box li {
+    margin-left: 1.2rem;
+}
+
+.answer-box strong {
+    font-weight: 600;
+}
