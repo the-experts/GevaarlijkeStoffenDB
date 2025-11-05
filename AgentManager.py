@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 import logging
 
 from langchain_core.messages import HumanMessage, BaseMessage
-from langgraph.graph import CompiledGraph
+from langgraph.graph import StateGraph
 
 from State import AgentState, DocumentIngestState
 from Agent import graph as query_graph
@@ -120,7 +120,7 @@ class BaseWorkflow(ABC):
     consistent initialization and execution patterns.
     """
 
-    def __init__(self, graph: CompiledGraph):
+    def __init__(self, graph: StateGraph):
         self.graph = graph
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 

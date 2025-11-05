@@ -6,7 +6,7 @@ from fastapi import FastAPI, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from AgentManager import AgentManager
+from AgentManager import AgentManager, WorkflowType, ExecutionStatus
 
 load_dotenv()
 
@@ -178,3 +178,134 @@ async def query(request: QueryRequest):
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+@app.post(
+    "/execute/",
+    response_model=UnifiedResponse,
+    tags=["Unified"],
+    summary="Universal endpoint with automatic workflow detection",
+    description="""
+    Unified endpoint that automatically detects and executes the appropriate workflow.
+
+    **Automatic Routing:**
+    - If a PDF file is provided → Document Ingest workflow
+    - If only a question is provided → Query workflow
+    - If both are provided → File takes priority (question is ignored)
+
+    **Parameters:**
+    - **file** (optional): PDF file to process
+    - **question** (optional): Natural language question
+    - **max_length** (optional): Chunk size for PDF processing (default: 1000)
+    - **overlap** (optional): Chunk overlap for PDF processing (default: 100)
+
+    **Returns:**
+    Unified response with workflow_type, status, and workflow-specific data.
+
+    **Examples:**
+    - Upload PDF → Returns ingest results with chunks_stored
+    - Ask question → Returns query results with answer and routing
+    """
+)
+async def execute_unified(
+    file: UploadFile = None,
+    question: str = Form(None),
+    max_length: int = Form(1000),
+    overlap: int = Form(100)
+):
+    """Universal endpoint with automatic workflow detection via AgentManager."""
+
+    # Validate that at least one input is provided
+    if not file and not question:
+        return UnifiedResponse(
+            success=False,
+            workflow_type="unknown",
+            status="error",
+            data={},
+            error="Either 'file' or 'question' must be provided"
+        )
+
+    # File takes priority - if file is present, execute ingest workflow
+    if file:
+        # Validate file type
+        if not file.filename.endswith('.pdf'):
+            return UnifiedResponse(
+                success=False,
+                workflow_type=WorkflowType.INGEST.value,
+                status="error",
+                data={},
+                error="Only PDF files are supported"
+            )
+
+        # Save to temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            contents = await file.read()
+            if len(contents) == 0:
+                os.remove(tmp.name)
+                return UnifiedResponse(
+                    success=False,
+                    workflow_type=WorkflowType.INGEST.value,
+                    status="error",
+                    data={},
+                    error="Uploaded file is empty"
+                )
+            tmp.write(contents)
+            tmp_path = tmp.name
+
+        try:
+            # Execute document ingest through AgentManager
+            result = AgentManager.execute_ingest(
+                file_path=tmp_path,
+                source_filename=file.filename,
+                max_length=max_length,
+                overlap=overlap
+            )
+
+            return UnifiedResponse(
+                success=result.success,
+                workflow_type=result.workflow_type.value,
+                status=result.status.value,
+                data=result.data,
+                error=result.error,
+                metadata=result.metadata
+            )
+
+        except Exception as e:
+            return UnifiedResponse(
+                success=False,
+                workflow_type=WorkflowType.INGEST.value,
+                status="error",
+                data={},
+                error=f"Workflow execution failed: {str(e)}"
+            )
+        finally:
+            # Cleanup temporary file
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+
+    # No file - execute query workflow
+    else:
+        try:
+            # Execute query through AgentManager
+            result = AgentManager.execute_query(question=question)
+
+            return UnifiedResponse(
+                success=result.success,
+                workflow_type=result.workflow_type.value,
+                status=result.status.value,
+                data=result.data,
+                error=result.error,
+                metadata=result.metadata
+            )
+
+        except Exception as e:
+            return UnifiedResponse(
+                success=False,
+                workflow_type=WorkflowType.QUERY.value,
+                status="error",
+                data={},
+                error=f"Workflow execution failed: {str(e)}"
+            )
