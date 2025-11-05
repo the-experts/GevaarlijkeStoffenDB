@@ -1,12 +1,13 @@
 import os
 import tempfile
+from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from AgentManager import AgentManager, WorkflowType, ExecutionStatus
+import AgentManager
 
 load_dotenv()
 
@@ -31,17 +32,17 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     success: bool
-    question: str = None
-    answer: str = None
-    routing: str = None
-    db_results_count: int = None
-    error: str = None
+    question: Optional[str] = None
+    answer: Optional[str] = None
+    routing: Optional[str] = None
+    db_results_count: Optional[int] = None
+    error: Optional[str] = None
 
 
 class PDFProcessResponse(BaseModel):
     success: bool
-    stored_chunks: int = None
-    error: str = None
+    stored_chunks: Optional[int] = None
+    error: Optional[str] = None
 
 
 class UnifiedResponse(BaseModel):
@@ -50,8 +51,8 @@ class UnifiedResponse(BaseModel):
     workflow_type: str
     status: str
     data: dict
-    error: str = None
-    metadata: dict = None
+    error: Optional[str] = None
+    metadata: Optional[dict] = None
 
 
 # CORS configureren zodat React kan praten met de backend
@@ -215,6 +216,7 @@ async def execute_unified(
 ):
     """Universal endpoint with automatic workflow detection via AgentManager."""
 
+    print('kut ding')
     # Validate that at least one input is provided
     if not file and not question:
         return UnifiedResponse(
@@ -231,7 +233,7 @@ async def execute_unified(
         if not file.filename.endswith('.pdf'):
             return UnifiedResponse(
                 success=False,
-                workflow_type=WorkflowType.INGEST.value,
+                workflow_type="ingest",
                 status="error",
                 data={},
                 error="Only PDF files are supported"
@@ -244,7 +246,7 @@ async def execute_unified(
                 os.remove(tmp.name)
                 return UnifiedResponse(
                     success=False,
-                    workflow_type=WorkflowType.INGEST.value,
+                    workflow_type="ingest",
                     status="error",
                     data={},
                     error="Uploaded file is empty"
@@ -273,7 +275,7 @@ async def execute_unified(
         except Exception as e:
             return UnifiedResponse(
                 success=False,
-                workflow_type=WorkflowType.INGEST.value,
+                workflow_type="ingest",
                 status="error",
                 data={},
                 error=f"Workflow execution failed: {str(e)}"
@@ -304,7 +306,7 @@ async def execute_unified(
         except Exception as e:
             return UnifiedResponse(
                 success=False,
-                workflow_type=WorkflowType.QUERY.value,
+                workflow_type="query",
                 status="error",
                 data={},
                 error=f"Workflow execution failed: {str(e)}"

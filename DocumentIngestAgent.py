@@ -21,28 +21,26 @@ def document_workflow(workflow):
 
     # Add nodes to the workflow
     workflow.add_node("validate_pdf", validate_pdf_node)
-    workflow.add_node("end_or_continue", end_after_validate)
     workflow.add_node("extract_content", extract_content_node)
     workflow.add_node("chunk_text", chunk_text_node)
     workflow.add_node("embed_chunks", embed_chunks_node)
     workflow.add_node("store_chunks", store_chunks_node)
 
-    # workflow.add_edge("document_agent", "validate_pdf")
-    workflow.add_edge("validate_pdf", "end_or_continue")
-    workflow.add_edge("extract_content", "chunk_text")
-    workflow.add_edge("chunk_text", "embed_chunks")
-    workflow.add_edge("embed_chunks", "store_chunks")
-    workflow.add_edge("store_chunks", END)
-
-    # Conditional routing
+    # Conditional routing after validation - go directly to conditional edge
     workflow.add_conditional_edges(
-        "end_or_continue",
+        "validate_pdf",
         end_after_validate,
         {
             "continue": "extract_content",
             "end": END
         },
     )
+
+    # Linear workflow for successful processing
+    workflow.add_edge("extract_content", "chunk_text")
+    workflow.add_edge("chunk_text", "embed_chunks")
+    workflow.add_edge("embed_chunks", "store_chunks")
+    workflow.add_edge("store_chunks", END)
 
     return workflow
 
