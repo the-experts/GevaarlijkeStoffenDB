@@ -75,113 +75,6 @@ def root():
     return {"status": "ok", "message": "Backend is online"}
 
 @app.post(
-    "/process-pdf/",
-    response_model=PDFProcessResponse,
-    tags=["Documents"],
-    summary="Process and store PDF document",
-    description="""
-    Upload a PDF document to extract text and tables, generate embeddings, and store in the vector database.
-
-    The PDF will be:
-    1. Parsed for text and tables
-    2. Split into chunks with configurable size and overlap
-    3. Embedded using OpenAI's text-embedding-3-small model
-    4. Stored in PostgreSQL with pgvector for similarity search
-
-    **Parameters:**
-    - **file**: PDF file to process
-    - **max_length**: Maximum chunk size in characters (default: 1000)
-    - **overlap**: Character overlap between chunks (default: 100)
-    """
-)
-async def process_pdf(file: UploadFile, max_length: int = Form(1000), overlap: int = Form(100)):
-    """Process PDF using LangGraph agent workflow."""
-
-    # Validate file type
-    if not file.filename.endswith('.pdf'):
-        return {"success": False, "error": "Only PDF files are supported"}
-
-    # Save to temporary file
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        contents = await file.read()
-        if len(contents) == 0:
-            os.remove(tmp.name)
-            return {"success": False, "error": "Uploaded file is empty"}
-        tmp.write(contents)
-        tmp_path = tmp.name
-
-    try:
-        # Execute document ingest through AgentManager
-        result = AgentManager.execute_ingest(
-            file_path=tmp_path,
-            source_filename=file.filename,
-            max_length=max_length,
-            overlap=overlap
-        )
-
-        # Return structured response
-        return {
-            "success": result.success,
-            "stored_chunks": result.data.get("chunks_stored", 0),
-            "error": result.error
-        }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Workflow execution failed: {str(e)}"
-        }
-    finally:
-        # Cleanup temporary file
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except Exception:
-                pass  # Ignore cleanup errors
-
-@app.post(
-    "/query/",
-    response_model=QueryResponse,
-    tags=["Query"],
-    summary="Ask a question about dangerous substances",
-    description="""
-    Submit a natural language question to query the dangerous substances database.
-
-    The system will:
-    1. Embed your question using OpenAI embeddings
-    2. Search the vector database for relevant document chunks
-    3. Route your query to the appropriate specialist agent (stoffen or PBM)
-    4. Generate a comprehensive answer using GPT-4 with retrieved context
-
-    **Available Agents:**
-    - **stoffen**: Handles general questions about dangerous substances, chemicals, properties, hazards
-    - **pbm**: Handles questions about personal protective equipment and safety measures
-
-    **Example Questions:**
-    - "Welke voorwaarden hebben schepen waarvan de ladingzone voor 30 december 2018 is omgebouwd?"
-    - "Welke beschermingsmiddelen zijn nodig voor het werken met benzeen?"
-    - "Wat zijn de eigenschappen van UN nummer 1203?"
-    """
-)
-async def query(request: QueryRequest):
-    """Query the database with a natural language question."""
-    try:
-        # Execute query through AgentManager
-        result = AgentManager.execute_query(question=request.question)
-
-        # Return structured response
-        return {
-            "success": result.success,
-            "question": request.question,
-            "answer": result.data.get("answer", "No answer generated"),
-            "routing": result.data.get("routing", "unknown"),
-            "db_results_count": result.data.get("db_results_count", 0)
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-@app.post(
     "/execute/",
     response_model=UnifiedResponse,
     tags=["Unified"],
@@ -214,9 +107,12 @@ async def execute_unified(
     max_length: int = Form(1000),
     overlap: int = Form(100)
 ):
-    """Universal endpoint with automatic workflow detection via AgentManager."""
+    """Universal endpoint with automatic workflow detection via AgentManager.
 
-    print('kut ding')
+    This endpoint delegates routing to the LangGraph workflow, which automatically
+    decides whether to execute document ingest or query workflow based on inputs.
+    """
+
     # Validate that at least one input is provided
     if not file and not question:
         return UnifiedResponse(
@@ -227,7 +123,8 @@ async def execute_unified(
             error="Either 'file' or 'question' must be provided"
         )
 
-    # File takes priority - if file is present, execute ingest workflow
+    # Prepare file path if file is provided
+    tmp_path = None
     if file:
         # Validate file type
         if not file.filename.endswith('.pdf'):
@@ -254,60 +151,37 @@ async def execute_unified(
             tmp.write(contents)
             tmp_path = tmp.name
 
-        try:
-            # Execute document ingest through AgentManager
-            result = AgentManager.execute_ingest(
-                file_path=tmp_path,
-                source_filename=file.filename,
-                max_length=max_length,
-                overlap=overlap
-            )
+    try:
+        # Execute unified workflow - LangGraph handles routing automatically
+        result = AgentManager.execute_workflow(
+            file_path=tmp_path,
+            source_filename=file.filename if file else None,
+            question=question,
+            max_length=max_length,
+            overlap=overlap
+        )
 
-            return UnifiedResponse(
-                success=result.success,
-                workflow_type=result.workflow_type.value,
-                status=result.status.value,
-                data=result.data,
-                error=result.error,
-                metadata=result.metadata
-            )
+        return UnifiedResponse(
+            success=result.success,
+            workflow_type=result.workflow_type.value,
+            status=result.status.value,
+            data=result.data,
+            error=result.error,
+            metadata=result.metadata
+        )
 
-        except Exception as e:
-            return UnifiedResponse(
-                success=False,
-                workflow_type="ingest",
-                status="error",
-                data={},
-                error=f"Workflow execution failed: {str(e)}"
-            )
-        finally:
-            # Cleanup temporary file
-            if os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except Exception:
-                    pass
-
-    # No file - execute query workflow
-    else:
-        try:
-            # Execute query through AgentManager
-            result = AgentManager.execute_query(question=question)
-
-            return UnifiedResponse(
-                success=result.success,
-                workflow_type=result.workflow_type.value,
-                status=result.status.value,
-                data=result.data,
-                error=result.error,
-                metadata=result.metadata
-            )
-
-        except Exception as e:
-            return UnifiedResponse(
-                success=False,
-                workflow_type="query",
-                status="error",
-                data={},
-                error=f"Workflow execution failed: {str(e)}"
-            )
+    except Exception as e:
+        return UnifiedResponse(
+            success=False,
+            workflow_type="unknown",
+            status="error",
+            data={},
+            error=f"Workflow execution failed: {str(e)}"
+        )
+    finally:
+        # Cleanup temporary file if it was created
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass  # Ignore cleanup errors
