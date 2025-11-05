@@ -55,7 +55,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.get("/", tags=["Health"])
 def root():
     """
@@ -65,7 +64,6 @@ def root():
         dict: Status message indicating the backend is online
     """
     return {"status": "ok", "message": "Backend is online"}
-
 
 @app.post(
     "/process-pdf/",
@@ -129,7 +127,6 @@ async def process_pdf(file: UploadFile, max_length: int = Form(1000), overlap: i
         os.remove(tmp_path)
 
     return {"success": True, "stored_chunks": rows}
-
 
 @app.post(
     "/query/",

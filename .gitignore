@@ -1,8 +1,11 @@
+# IDE bestanden
 .idea/
-.env
-uv.lock
 
-# Python
+# Environment bestanden
+.env
+
+# Python/Poetry lock
+uv.lock
 __pycache__/
 *.py[cod]
 *$py.class
@@ -11,3 +14,13 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# React / Node frontend
+/frontend/node_modules/
+/frontend/dist/
+/frontend/build/
+/frontend/.env
+/frontend/.cache
+/frontend/.vite
+/frontend/.DS_Store
+/frontend/package-lock.json
