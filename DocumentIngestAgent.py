@@ -4,10 +4,12 @@ Document Ingestion Agent - LangGraph workflow for PDF processing.
 This module defines a LangGraph workflow that processes PDF documents through
 a series of steps: validation, extraction, chunking, embedding, and storage.
 """
+import logging
 
 from langgraph.graph import StateGraph, END, START
+logger = logging.getLogger(__name__)
 
-from State import DocumentIngestState, AgentState
+from State import AgentState
 from Tools import (
     validate_pdf_node,
     extract_content_node,
@@ -49,6 +51,7 @@ def end_after_validate(state: AgentState) -> str:
     document = state["documentState"]
     status = document.get("status")
 
+    logger.info("end_after_validate: " + status)
     if status == "error":
         return "end"
     else:

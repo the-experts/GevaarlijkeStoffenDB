@@ -199,16 +199,38 @@ Include information about hazards, safety measures, and any relevant warnings.""
 
 
 def PBM_agent(state: AgentState) -> AgentState:
-    """PBM agent"""
+    """PBM agent - processes queries about the stuff need for handling dangerous substances"""
+    # Initialize LLM (do this once at the top of your file)
+    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
     results = state.get("db_results", [])
     query = state.get("query", "")
 
-    print(f"🔧 Processing PBM query")
+    print(f"⚠️  PBM agent processing query: {query}")
+    print(f"   Found {len(results)} database results")
 
-    response = f"PBM information for '{query}': Found {len(results)} results - {', '.join(results)}"
+    # Create prompt for the LLM
+    system_prompt = """You are PPM-Agent, an expert assistant specializing in Personal Protection Material (PPM).
+        Advise users on the correct type of PPM for specific work situations or hazardous materials."""
+
+    user_prompt = f"""User query: {query}
+
+    Database results found:
+    {results}
+
+    Please provide a comprehensive answer about the dangerous substances related to this query.
+    Include information about hazards, safety measures, and any relevant warnings."""
+
+    # Call the LLM
+    response = llm.invoke([
+      SystemMessage(content=system_prompt),
+      HumanMessage(content=user_prompt)
+    ])
+
+    print(f"✅ Generated response: {response.content[:100]}...")
 
     return {
-        "messages": [AIMessage(content=response)]
+        "messages": [AIMessage(content=response.content)]
     }
 
 
@@ -219,52 +241,64 @@ def PBM_agent(state: AgentState) -> AgentState:
 logger = logging.getLogger(__name__)
 
 
-def validate_pdf_node(state: DocumentIngestState) -> DocumentIngestState:
+def validate_pdf_node(state: AgentState) -> AgentState:
     """Validate PDF file and check for duplicates."""
-
-    file_path = state["file_path"]
-    source_filename = state["source_filename"]
+    print("validate_pdf_node - state: " + str(state))
+    file_path = state.get("documentState").get("file_path")
+    source_filename = state.get("documentState").get("source_filename")
 
     logger.info(f"Validating PDF: {source_filename}")
 
     # Check file exists
     if not os.path.exists(file_path):
-        return {
+        documentState = {
             "status": "error",
             "error_message": f"File not found: {file_path}"
         }
+        return {
+          "documentState": documentState
+        }
+    else:
+        logger.info(f"PDF: {file_path}")
 
     # Check file size
     file_size = os.path.getsize(file_path)
     if file_size == 0:
-        return {
+        documentState = {
             "status": "error",
             "error_message": "File is empty"
         }
+        return {
+          "documentState": documentState
+        }
+    else:
+        logger.info(f"PDF: {file_path}")
 
     # Check for duplicates in database
     db_check = PostgresDBConnector()
     try:
         if db_check.document_exists(source_filename):
-            return {
+            logger.info(f"PDF: already exists, skipping")
+            documentState = {
                 "status": "error",
                 "error_message": f"Document '{source_filename}' already exists in database"
             }
+            return {
+                "documentState": documentState
+            }
+
     finally:
         db_check.close_pool()
 
     logger.info(f"✓ Validated PDF: {source_filename} ({file_size} bytes)")
 
-    return {
-        "status": "extracting",
-        "current_step": "Extracting text and tables from PDF"
-    }
+    state.get("documentState")["status"] = "extracting"
+    return state
 
-
-def extract_content_node(state: DocumentIngestState) -> DocumentIngestState:
+def extract_content_node(state: AgentState) -> AgentState:
     """Extract text and tables from PDF."""
 
-    file_path = state["file_path"]
+    file_path = state.get("documentState").get("source_filename")
 
     logger.info("Extracting content from PDF...")
 
@@ -280,11 +314,10 @@ def extract_content_node(state: DocumentIngestState) -> DocumentIngestState:
 
         logger.info(f"✓ Extracted {len(pages)} pages")
 
-        return {
-            "extracted_pages": pages,
-            "status": "chunking",
-            "current_step": f"Chunking {len(pages)} pages into manageable segments"
-        }
+        state.get("documentState")["extracted_pages"] = pages
+        state.get("documentState")["status"] = "chunking"
+        state.get("documentState")["current_step"] = f"Chunking {len(pages)} pages into manageable segments"
+        return state
 
     except Exception as e:
         logger.error(f"Extraction failed: {e}")
@@ -294,12 +327,12 @@ def extract_content_node(state: DocumentIngestState) -> DocumentIngestState:
         }
 
 
-def chunk_text_node(state: DocumentIngestState) -> DocumentIngestState:
+def chunk_text_node(state: AgentState) -> AgentState:
     """Split pages into chunks with metadata."""
 
-    pages = state["extracted_pages"]
-    max_length = state.get("max_length", 1000)
-    overlap = state.get("overlap", 100)
+    pages = state.get("documentState").get("extracted_pages")
+    max_length = state.get("documentState").get("max_length", 1000)
+    overlap = state.get("documentState").get("overlap", 100)
 
     logger.info(f"Chunking {len(pages)} pages...")
 
@@ -309,11 +342,10 @@ def chunk_text_node(state: DocumentIngestState) -> DocumentIngestState:
 
         logger.info(f"✓ Created {len(chunks)} chunks")
 
-        return {
-            "chunks": chunks,
-            "status": "embedding",
-            "current_step": f"Generating embeddings for {len(chunks)} chunks"
-        }
+        state.get("documentState")["chunks"] = chunks
+        state.get("documentState")["status"] = "embedding"
+        state.get("documentState")["current_step"] = f"Generating embeddings for {len(chunks)} chunks"
+        return state
 
     except Exception as e:
         logger.error(f"Chunking failed: {e}")
@@ -323,10 +355,10 @@ def chunk_text_node(state: DocumentIngestState) -> DocumentIngestState:
         }
 
 
-def embed_chunks_node(state: DocumentIngestState) -> DocumentIngestState:
+def embed_chunks_node(state: AgentState) -> AgentState:
     """Generate embeddings for chunks."""
 
-    chunks = state["chunks"]
+    chunks = state.get("documentState").get("chunks")
 
     logger.info(f"Generating embeddings for {len(chunks)} chunks...")
 
@@ -336,11 +368,10 @@ def embed_chunks_node(state: DocumentIngestState) -> DocumentIngestState:
 
         logger.info(f"✓ Generated {len(chunks_with_embeddings)} embeddings")
 
-        return {
-            "chunks_with_embeddings": chunks_with_embeddings,
-            "status": "storing",
-            "current_step": f"Storing {len(chunks_with_embeddings)} chunks in database"
-        }
+        state.get("documentState")["chunks_with_embeddings"] = chunks_with_embeddings
+        state.get("documentState")["status"] = "storing"
+        state.get("documentState")["current_step"] = f"Storing {len(chunks_with_embeddings)} chunks in database"
+        return state
 
     except Exception as e:
         logger.error(f"Embedding failed: {e}")
@@ -350,11 +381,11 @@ def embed_chunks_node(state: DocumentIngestState) -> DocumentIngestState:
         }
 
 
-def store_chunks_node(state: DocumentIngestState) -> DocumentIngestState:
+def store_chunks_node(state: AgentState) -> AgentState:
     """Store chunks with embeddings in database."""
 
-    chunks_with_embeddings = state["chunks_with_embeddings"]
-    source_filename = state["source_filename"]
+    chunks_with_embeddings = state.get("documentState").get("chunks_with_embeddings")
+    source_filename = state.get("documentState").get("source_filename")
 
     logger.info(f"Storing {len(chunks_with_embeddings)} chunks in database...")
 
@@ -379,11 +410,10 @@ def store_chunks_node(state: DocumentIngestState) -> DocumentIngestState:
 
         logger.info(f"✓ Stored {rows_affected} chunks")
 
-        return {
-            "chunks_stored": rows_affected,
-            "status": "complete",
-            "current_step": "Document processing complete"
-        }
+        state.get("documentState")["chunks_stored"] = rows_affected
+        state.get("documentState")["status"] = "complete"
+        state.get("documentState")["current_step"] = "Document processing complete"
+        return state
 
     except Exception as e:
         logger.error(f"Storage failed: {e}")

@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 def extract_text_and_tables(pdf_path):
     content = []
+    logger.info(f"Extracting text from PDF: {pdf_path}")
     with pdfplumber.open(pdf_path) as pdf:
         for page_number, page in enumerate(pdf.pages, start=1):
             text = page.extract_text() or ""

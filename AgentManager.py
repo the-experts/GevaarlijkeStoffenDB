@@ -60,10 +60,8 @@ def initialize_agent():
 
 def route_document_query(state: AgentState) -> str:
     """Get the routing decision from state"""
-    document = state["documentState"]
-    file_path = document.get("file_path")
 
-    if file_path is not None:
+    if state.get("documentState").get("source_filename"):
         return "document"
     else:
         return "question"
