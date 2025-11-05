@@ -4,17 +4,6 @@ from typing_extensions import TypedDict, Annotated
 from langchain_core.messages import AnyMessage
 import operator
 
-class AgentState(TypedDict):
-    messages: Annotated[list[AnyMessage], operator.add]
-    query: NotRequired[str]
-    embedded_query: NotRequired[list]
-    db_results: NotRequired[list]
-    routing_decision: str
-
-class MessagesState(TypedDict):
-    messages: Annotated[list[AnyMessage], operator.add]
-    llm_calls: int
-
 
 class DocumentIngestState(TypedDict):
     file_path: str
@@ -28,3 +17,16 @@ class DocumentIngestState(TypedDict):
     chunks_with_embeddings: NotRequired[list]
     chunks_stored: int
     error_message: NotRequired[str]
+
+
+class AgentState(TypedDict):
+    messages: Annotated[list[AnyMessage], operator.add]
+    query: NotRequired[str]
+    embedded_query: NotRequired[list]
+    db_results: NotRequired[list]
+    routing_decision: str
+    documentState: NotRequired[DocumentIngestState]
+
+class MessagesState(TypedDict):
+    messages: Annotated[list[AnyMessage], operator.add]
+    llm_calls: int

@@ -10,38 +10,35 @@ from Tools import embed_question, router_agent, PBM_agent, stoffen_agent, route_
 model = ChatOpenAI(model="gpt-4", temperature=0)
 
 
+def question_workflow(workflow):
 
-# Define workflow
-workflow = StateGraph(AgentState)
+    # Add nodes
+    workflow.add_node("embed_question", embed_question)
+    workflow.add_node("query_db", query_db)
+    workflow.add_node("router_agent", router_agent)
+    workflow.add_node("stoffen_agent", stoffen_agent)
+    workflow.add_node("PBM_agent", PBM_agent)
 
-# Add nodes
-workflow.add_node("embed_question", embed_question)
-workflow.add_node("query_db", query_db)
-workflow.add_node("router_agent", router_agent)
-workflow.add_node("stoffen_agent", stoffen_agent)
-workflow.add_node("PBM_agent", PBM_agent)
+    # Add edges
+    # workflow.add_edge("question_agent", "embed_question")
+    workflow.add_edge("embed_question", "query_db")
+    workflow.add_edge("query_db", "router_agent")
 
-# Add edges
-workflow.add_edge(START, "embed_question")
-workflow.add_edge("embed_question", "query_db")
-workflow.add_edge("query_db", "router_agent")
+    # Conditional routing
+    workflow.add_conditional_edges(
+        "router_agent",
+        route_query,
+        {
+            "stoffen": "stoffen_agent",
+            "pbm": "PBM_agent"
+        },
+    )
 
-# Conditional routing
-workflow.add_conditional_edges(
-    "router_agent",
-    route_query,
-    {
-        "stoffen": "stoffen_agent",
-        "pbm": "PBM_agent"
-    },
-)
+    # End edges - use END constant from langgraph.graph
+    workflow.add_edge("PBM_agent", END)
+    workflow.add_edge("stoffen_agent", END)
 
-# End edges - use END constant from langgraph.graph
-workflow.add_edge("PBM_agent", END)
-workflow.add_edge("stoffen_agent", END)
-
-# Compile the graph
-graph = workflow.compile()
+    return workflow
 
 # Optional: Visualize
 # try:
