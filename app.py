@@ -1,21 +1,19 @@
+import os
+import tempfile
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from dotenv import load_dotenv
-import os
-import tempfile
-from langchain_core.messages import HumanMessage
 
-from PostgresDBConnector import PostgresDBConnector
-from main import process_and_store_pdf
-from Agent import graph
+from AgentManager import AgentManager
 
 load_dotenv()
 
 app = FastAPI(
     title="Gevaarlijke Stoffen Database API",
-    description="RAG system for querying dangerous substances information from regulatory documents (ADN, ADR, CLP)",
-    version="1.0.0"
+    description="RAG system for querying dangerous substances information (unified via AgentManager)",
+    version="2.0.0"
 )
 
 
@@ -44,6 +42,16 @@ class PDFProcessResponse(BaseModel):
     success: bool
     stored_chunks: int = None
     error: str = None
+
+
+class UnifiedResponse(BaseModel):
+    """Unified response model for AgentManager workflows."""
+    success: bool
+    workflow_type: str
+    status: str
+    data: dict
+    error: str = None
+    metadata: dict = None
 
 
 # CORS configureren zodat React kan praten met de backend
@@ -88,25 +96,13 @@ def root():
     """
 )
 async def process_pdf(file: UploadFile, max_length: int = Form(1000), overlap: int = Form(100)):
-    """Process PDF and store embeddings in database."""
+    """Process PDF using LangGraph agent workflow."""
 
     # Validate file type
     if not file.filename.endswith('.pdf'):
         return {"success": False, "error": "Only PDF files are supported"}
 
-    # Check for duplicate document before processing
-    source_file = file.filename
-    db_check = PostgresDBConnector()
-    try:
-        if db_check.document_exists(source_file):
-            return {
-                "success": False,
-                "error": f"Document '{source_file}' already exists in database. Please delete it first or rename your file."
-            }
-    finally:
-        db_check.close_pool()
-
-    # Tijdelijk opslaan van de geüploade PDF
+    # Save to temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         contents = await file.read()
         if len(contents) == 0:
@@ -115,20 +111,34 @@ async def process_pdf(file: UploadFile, max_length: int = Form(1000), overlap: i
         tmp.write(contents)
         tmp_path = tmp.name
 
-    db = PostgresDBConnector()
     try:
-        rows = process_and_store_pdf(tmp_path, db_connector=db, max_length=max_length, overlap=overlap)
-        if rows == 0:
-            return {"success": False, "error": "No content could be extracted from the PDF"}
-    except ValueError as e:
-        return {"success": False, "error": f"PDF processing error: {str(e)}"}
-    except Exception as e:
-        return {"success": False, "error": f"Unexpected error: {str(e)}"}
-    finally:
-        db.close_pool()
-        os.remove(tmp_path)
+        # Execute document ingest through AgentManager
+        result = AgentManager.execute_ingest(
+            file_path=tmp_path,
+            source_filename=file.filename,
+            max_length=max_length,
+            overlap=overlap
+        )
 
-    return {"success": True, "stored_chunks": rows}
+        # Return structured response
+        return {
+            "success": result.success,
+            "stored_chunks": result.data.get("chunks_stored", 0),
+            "error": result.error
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Workflow execution failed: {str(e)}"
+        }
+    finally:
+        # Cleanup temporary file
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass  # Ignore cleanup errors
 
 
 @app.post(
@@ -158,23 +168,16 @@ async def process_pdf(file: UploadFile, max_length: int = Form(1000), overlap: i
 async def query(request: QueryRequest):
     """Query the database with a natural language question."""
     try:
-        # Create a HumanMessage with the question
-        messages = [HumanMessage(content=request.question)]
-
-        # Invoke the agent graph
-        result = graph.invoke({"messages": messages})
-
-        # Extract the final answer from the result
-        final_messages = result.get("messages", [])
-        answer = final_messages[-1].content if final_messages else "No answer generated"
+        # Execute query through AgentManager
+        result = AgentManager.execute_query(question=request.question)
 
         # Return structured response
         return {
-            "success": True,
+            "success": result.success,
             "question": request.question,
-            "answer": answer,
-            "routing": result.get("routing_decision", "unknown"),
-            "db_results_count": len(result.get("db_results", []))
+            "answer": result.data.get("answer", "No answer generated"),
+            "routing": result.data.get("routing", "unknown"),
+            "db_results_count": result.data.get("db_results_count", 0)
         }
     except Exception as e:
         return {"success": False, "error": str(e)}

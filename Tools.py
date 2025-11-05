@@ -9,11 +9,16 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 from PostgresDBConnector import PostgresDBConnector
-from State import AgentState
+from State import AgentState, DocumentIngestState
 
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
+
+# Import PDF processing functions from main.py
+from main import extract_text_and_tables, process_pages_to_chunks, embed_chunks_with_metadata
+import os
+import logging
 
 load_dotenv()
 
@@ -205,3 +210,186 @@ def PBM_agent(state: AgentState) -> AgentState:
     return {
         "messages": [AIMessage(content=response)]
     }
+
+
+# ============================================================================
+# DOCUMENT INGESTION AGENT NODES
+# ============================================================================
+
+logger = logging.getLogger(__name__)
+
+
+def validate_pdf_node(state: DocumentIngestState) -> DocumentIngestState:
+    """Validate PDF file and check for duplicates."""
+
+    file_path = state["file_path"]
+    source_filename = state["source_filename"]
+
+    logger.info(f"Validating PDF: {source_filename}")
+
+    # Check file exists
+    if not os.path.exists(file_path):
+        return {
+            "status": "error",
+            "error_message": f"File not found: {file_path}"
+        }
+
+    # Check file size
+    file_size = os.path.getsize(file_path)
+    if file_size == 0:
+        return {
+            "status": "error",
+            "error_message": "File is empty"
+        }
+
+    # Check for duplicates in database
+    db_check = PostgresDBConnector()
+    try:
+        if db_check.document_exists(source_filename):
+            return {
+                "status": "error",
+                "error_message": f"Document '{source_filename}' already exists in database"
+            }
+    finally:
+        db_check.close_pool()
+
+    logger.info(f"✓ Validated PDF: {source_filename} ({file_size} bytes)")
+
+    return {
+        "status": "extracting",
+        "current_step": "Extracting text and tables from PDF"
+    }
+
+
+def extract_content_node(state: DocumentIngestState) -> DocumentIngestState:
+    """Extract text and tables from PDF."""
+
+    file_path = state["file_path"]
+
+    logger.info("Extracting content from PDF...")
+
+    try:
+        # Use existing function from main.py
+        pages = extract_text_and_tables(file_path)
+
+        if not pages:
+            return {
+                "status": "error",
+                "error_message": "No extractable content in PDF"
+            }
+
+        logger.info(f"✓ Extracted {len(pages)} pages")
+
+        return {
+            "extracted_pages": pages,
+            "status": "chunking",
+            "current_step": f"Chunking {len(pages)} pages into manageable segments"
+        }
+
+    except Exception as e:
+        logger.error(f"Extraction failed: {e}")
+        return {
+            "status": "error",
+            "error_message": f"Extraction failed: {str(e)}"
+        }
+
+
+def chunk_text_node(state: DocumentIngestState) -> DocumentIngestState:
+    """Split pages into chunks with metadata."""
+
+    pages = state["extracted_pages"]
+    max_length = state.get("max_length", 1000)
+    overlap = state.get("overlap", 100)
+
+    logger.info(f"Chunking {len(pages)} pages...")
+
+    try:
+        # Use existing function from main.py
+        chunks = process_pages_to_chunks(pages, max_length, overlap)
+
+        logger.info(f"✓ Created {len(chunks)} chunks")
+
+        return {
+            "chunks": chunks,
+            "status": "embedding",
+            "current_step": f"Generating embeddings for {len(chunks)} chunks"
+        }
+
+    except Exception as e:
+        logger.error(f"Chunking failed: {e}")
+        return {
+            "status": "error",
+            "error_message": f"Chunking failed: {str(e)}"
+        }
+
+
+def embed_chunks_node(state: DocumentIngestState) -> DocumentIngestState:
+    """Generate embeddings for chunks."""
+
+    chunks = state["chunks"]
+
+    logger.info(f"Generating embeddings for {len(chunks)} chunks...")
+
+    try:
+        # Use existing function from main.py
+        chunks_with_embeddings = embed_chunks_with_metadata(chunks)
+
+        logger.info(f"✓ Generated {len(chunks_with_embeddings)} embeddings")
+
+        return {
+            "chunks_with_embeddings": chunks_with_embeddings,
+            "status": "storing",
+            "current_step": f"Storing {len(chunks_with_embeddings)} chunks in database"
+        }
+
+    except Exception as e:
+        logger.error(f"Embedding failed: {e}")
+        return {
+            "status": "error",
+            "error_message": f"Embedding failed: {str(e)}"
+        }
+
+
+def store_chunks_node(state: DocumentIngestState) -> DocumentIngestState:
+    """Store chunks with embeddings in database."""
+
+    chunks_with_embeddings = state["chunks_with_embeddings"]
+    source_filename = state["source_filename"]
+
+    logger.info(f"Storing {len(chunks_with_embeddings)} chunks in database...")
+
+    db_store = PostgresDBConnector()
+
+    try:
+        # Prepare batch data
+        batch_data = [
+            (
+                source_filename,
+                chunk['type'],
+                chunk['page_number'],
+                chunk['chunk_index'],
+                chunk['content'],
+                chunk['embedding']
+            )
+            for chunk in chunks_with_embeddings
+        ]
+
+        # Store in database
+        rows_affected = db_store.store_document_chunks_batch(batch_data)
+
+        logger.info(f"✓ Stored {rows_affected} chunks")
+
+        return {
+            "chunks_stored": rows_affected,
+            "status": "complete",
+            "current_step": "Document processing complete"
+        }
+
+    except Exception as e:
+        logger.error(f"Storage failed: {e}")
+        return {
+            "status": "error",
+            "error_message": f"Storage failed: {str(e)}"
+        }
+    finally:
+        db_store.close_pool()
