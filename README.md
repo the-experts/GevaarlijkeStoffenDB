@@ -21,22 +21,38 @@ DB_USER=postgres
 DB_PASSWORD={your_db_password}
 ```
 
-6. Start de PostgreSQL database:
+## Opstarten van de PostgreSQL database
+
+Begin bij het opstarten van de postrgresQL database.
+Deze draait in Docker. Zorg dat ook je docker destop app draait.
+
 ```bash
 docker-compose up -d
 ```
+
+## Opstarten frontend
+
+om de frontend te starten run je het volgende commando 
+(Er is ook een run configuration van gemakt, zodat je het direct uit intelllij kan uitvoeren)
+
+```bash
+cd /frontend
+npm run dev
+```
+
+➡️ De frontend draait nu op http://localhost:5173/
 
 ## Opstarten backend
 
 Om de API werkend te krijgen maken we gebruik van de FastAPI en Uvicorn
 
-Voer in de terminal het volgende commando uit:
+Voer in de terminal het volgende commando uit (er is ook een run commando van gemaakt):
 
 ```bash
 uvicorn app:app --reload
 ```
 
-➡️ Je backend draait nu op http://127.0.0.1:8000
+➡️ De backend draait nu op http://127.0.0.1:8000
 
 ### API Endpoints
 
