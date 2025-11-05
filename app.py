@@ -1,5 +1,6 @@
 import os
 import tempfile
+from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, Form
@@ -31,17 +32,17 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     success: bool
-    question: str = None
-    answer: str = None
-    routing: str = None
-    db_results_count: int = None
-    error: str = None
+    question: Optional[str] = None
+    answer: Optional[str] = None
+    routing: Optional[str] = None
+    db_results_count: Optional[int] = None
+    error: Optional[str] = None
 
 
 class PDFProcessResponse(BaseModel):
     success: bool
-    stored_chunks: int = None
-    error: str = None
+    stored_chunks: Optional[int] = None
+    error: Optional[str] = None
 
 
 class UnifiedResponse(BaseModel):
@@ -50,8 +51,8 @@ class UnifiedResponse(BaseModel):
     workflow_type: str
     status: str
     data: dict
-    error: str = None
-    metadata: dict = None
+    error: Optional[str] = None
+    metadata: Optional[dict] = None
 
 
 # CORS configureren zodat React kan praten met de backend
